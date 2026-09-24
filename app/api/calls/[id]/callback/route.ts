@@ -1,22 +1,25 @@
 import { NextResponse } from 'next/server';
 import { guard, notFound, readJson } from '@/lib/api';
-import { findCall, audit } from '@/lib/db';
+import { audit, findCall, updateCall } from '@/lib/db';
 
 /**
  * "Call back" for finished calls, "Take over" for live ones, or "Text patient" (mode: 'text')
  * for items like a failed deposit. Resolves the item from Needs attention.
+ * Placing the actual call / text is wired in with the telephony and SMS providers.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await guard('callBack');
   if (g.error) return g.error;
-  const call = findCall((await params).id);
+  const call = await findCall(g.practiceId, (await params).id);
   if (!call) return notFound('Call not found');
   const body = await readJson<{ mode?: 'call' | 'text' }>(req);
 
   const tookOver = call.outcome === 'Live';
-  if (call.outcome === 'Needs human' || tookOver) call.outcome = 'Resolved';
-  call.resolved = true;
-  audit(g.user.id, body?.mode === 'text' ? 'text-patient' : tookOver ? 'take-over' : 'call-back', call.id);
+  await updateCall(g.practiceId, call.id, {
+    resolved: true,
+    ...(call.outcome === 'Needs human' || tookOver ? { outcome: 'Resolved' as const } : {}),
+  });
+  await audit(g.practiceId, g.user.id, body?.mode === 'text' ? 'text-patient' : tookOver ? 'take-over' : 'call-back', call.id);
 
   const message =
     body?.mode === 'text'

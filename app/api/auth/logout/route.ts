@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE } from '@/lib/auth';
+import { auth, signOut } from '@/auth';
+import { deleteAuthSession } from '@/lib/db';
 
 export async function POST() {
-  const res = NextResponse.json({ ok: true });
-  res.cookies.delete(SESSION_COOKIE);
-  return res;
+  const s = await auth();
+  if (s?.sid) await deleteAuthSession(s.sid);
+  await signOut({ redirect: false });
+  return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db, audit, findCall, findPatient, findMember } from '@/lib/db';
+import { audit, auditCount, findCall, findPatient, teamMember } from '@/lib/db';
 import { guard, bad, notFound, readJson } from '@/lib/api';
 
 const Body = z.object({ kind: z.enum(['call', 'patient', 'member']), id: z.string() });
@@ -13,15 +13,12 @@ export async function POST(req: Request) {
   if (!parsed.success) return bad('Invalid request');
   const { kind, id } = parsed.data;
 
-  let phone: string | undefined;
-  if (kind === 'call') phone = findCall(id)?.phone;
-  if (kind === 'patient') phone = findPatient(id)?.phone;
-  if (kind === 'member') {
-    const m = findMember(id);
-    phone = m ? `(512) 555-${m.last4}` : undefined;
-  }
+  let phone: string | undefined | null;
+  if (kind === 'call') phone = (await findCall(g.practiceId, id))?.phone;
+  if (kind === 'patient') phone = (await findPatient(g.practiceId, id))?.phone;
+  if (kind === 'member') phone = (await teamMember(g.practiceId, id))?.phone;
   if (!phone) return notFound();
 
-  audit(g.user.id, 'reveal-phone', `${kind}:${id}`);
-  return NextResponse.json({ phone, revealedBy: g.user.name, remaskAfterSeconds: 15, auditCount: db.audit.length });
+  await audit(g.practiceId, g.user.id, 'reveal-phone', `${kind}:${id}`);
+  return NextResponse.json({ phone, revealedBy: g.user.name, remaskAfterSeconds: 15, auditCount: await auditCount(g.practiceId) });
 }

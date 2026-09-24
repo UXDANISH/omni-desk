@@ -7,9 +7,9 @@ import { Pill, Tag } from '@/components/ui/Pill';
 import { Card, CardHeader, StatTile, Empty } from '@/components/ui/Card';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { Icon } from '@/components/ui/Icon';
-import { requireUser } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { can } from '@/lib/permissions';
-import { db } from '@/lib/db';
+import { listAppointments, listCalls } from '@/lib/db';
 import { PROVIDERS, TODAY_INDEX, NOW_MINUTES, WEEK } from '@/lib/mock/appointments';
 import { STATS, RANGES, OVERVIEW, MIX_LEGEND, WAITING, TAG_PRIORITY, parseRange } from '@/lib/mock/stats';
 import { OUTCOME, attentionTone, isNeedsHuman, needsAttention } from '@/lib/tones';
@@ -24,17 +24,18 @@ const pct = (now: number, prev: number) => {
 };
 
 export default async function OverviewPage({ searchParams }: PageProps) {
-  const user = await requireUser();
+  const { user, practiceId } = await requireSession();
+  const [calls, appointments] = await Promise.all([listCalls(practiceId), listAppointments(practiceId)]);
   const range = parseRange(one((await searchParams).range));
   const st = STATS[range];
   const ov = OVERVIEW[range];
   const showMoney = can(user.role, 'seeDepositTotals');
 
-  const needs = db.calls.filter(isNeedsHuman);
-  const attention = db.calls.filter(needsAttention).sort((a, b) => (TAG_PRIORITY[a.tag ?? ''] ?? 9) - (TAG_PRIORITY[b.tag ?? ''] ?? 9));
-  const live = db.calls.find((c) => c.outcome === 'Live');
-  const latest = db.calls.slice(0, 5);
-  const today = db.appointments.filter((a) => a.day === TODAY_INDEX);
+  const needs = calls.filter(isNeedsHuman);
+  const attention = calls.filter(needsAttention).sort((a, b) => (TAG_PRIORITY[a.tag ?? ''] ?? 9) - (TAG_PRIORITY[b.tag ?? ''] ?? 9));
+  const live = calls.find((c) => c.outcome === 'Live');
+  const latest = calls.slice(0, 5);
+  const today = appointments.filter((a) => a.day === TODAY_INDEX);
   const upNext = today.filter((a) => a.start >= NOW_MINUTES).slice(0, 5);
   const mixTotal = ov.mix.reduce((x, y) => x + y, 0);
   const maxBar = Math.max(...ov.bars.map((b) => b[1]));

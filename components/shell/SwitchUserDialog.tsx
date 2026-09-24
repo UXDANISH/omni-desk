@@ -87,7 +87,7 @@ export function SwitchUserDialog({ open, onClose }: { open: boolean; onClose: ()
               aria-invalid={!!error}
               className="cf-input h-[52px] w-[180px] text-center font-mono text-2xl tracking-[0.6em]"
             />
-            {error ? <span role="alert" className="text-xs text-danger">{error}</span> : <span className="text-xs text-muted">Demo: any 4 digits work.</span>}
+            {error ? <span role="alert" className="text-xs text-danger">{error}</span> : <span className="text-xs text-muted">Their own PIN, set in Your profile.</span>}
           </label>
         </div>
       )}

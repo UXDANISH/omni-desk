@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast';
 import { SwitchUserDialog } from '@/components/shell/SwitchUserDialog';
 import { applyTheme, type ThemePref } from '@/components/shell/ThemeToggle';
 import { api } from '@/lib/client';
+import { ChangeSecretDialog } from './ChangeSecretDialog';
 import type { SessionInfo, TeamMember } from '@/lib/types';
 
 export function ProfileForm({ me, sessions, themePref }: { me: TeamMember; sessions: SessionInfo[]; themePref: ThemePref }) {
@@ -23,6 +24,7 @@ export function ProfileForm({ me, sessions, themePref }: { me: TeamMember; sessi
   const [pref, setPref] = useState<ThemePref>(themePref);
   const [dirty, setDirty] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [changing, setChanging] = useState<'password' | 'pin' | null>(null);
   const owner = me.role === 'Owner';
   const edit = <T,>(set: (v: T) => void) => (v: T) => { set(v); setDirty(true); };
 
@@ -89,13 +91,13 @@ export function ProfileForm({ me, sessions, themePref }: { me: TeamMember; sessi
             <section className="cf-card flex flex-col p-[18px]">
               <h2 className="mb-2.5 text-base font-semibold">Sign-in</h2>
               <div className="flex items-center gap-3 border-t py-3">
-                <span className="flex flex-1 flex-col"><span className="font-medium">Password</span><span className="text-xs text-muted">Last changed Jul 14, 2026</span></span>
-                <button type="button" className="cf-btn" onClick={() => toast(`A reset link will be emailed to ${email}.`)}>Change</button>
+                <span className="flex flex-1 flex-col"><span className="font-medium">Password</span><span className="text-xs text-muted">At least 10 characters</span></span>
+                <button type="button" className="cf-btn" onClick={() => setChanging('password')}>Change</button>
               </div>
               <div className="flex items-center gap-3 border-t py-3">
                 <span className="flex flex-1 flex-col"><span className="font-medium">Switch-user PIN</span><span className="text-xs text-muted">4 digits, used on shared front-desk computers</span></span>
                 <span className="font-mono tracking-[0.2em] text-muted" aria-hidden="true">••••</span>
-                <button type="button" className="cf-btn" onClick={() => toast('PIN change form comes with the auth provider.')}>Change</button>
+                <button type="button" className="cf-btn" onClick={() => setChanging('pin')}>Change</button>
               </div>
               <div className="flex items-center gap-3 border-t py-3">
                 <span className="flex flex-1 flex-col"><span className="font-medium">Two-step sign-in</span><span className="text-xs text-muted">Text a code to your mobile when signing in on a new device</span></span>
@@ -124,6 +126,7 @@ export function ProfileForm({ me, sessions, themePref }: { me: TeamMember; sessi
           </div>
         </div>
       </PageBody>
+      <ChangeSecretDialog kind={changing ?? 'password'} open={!!changing} onClose={() => setChanging(null)} />
       <SwitchUserDialog open={switching} onClose={() => setSwitching(false)} />
     </>
   );

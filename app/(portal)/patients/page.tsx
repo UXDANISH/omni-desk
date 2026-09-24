@@ -7,8 +7,8 @@ import { Icon } from '@/components/ui/Icon';
 import { Empty } from '@/components/ui/Card';
 import { MaskedPhone } from '@/components/ui/MaskedPhone';
 import { ConsentChips } from '@/components/ui/ConsentChips';
-import { requireUser } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { requireSession } from '@/lib/auth';
+import { listAppointments, listPatients, listRecallQueue } from '@/lib/db';
 import { TODAY_INDEX } from '@/lib/mock/appointments';
 import { statusTone } from '@/lib/tones';
 import { dayLabel, fmtTime, one } from '@/lib/format';
@@ -20,9 +20,9 @@ export const metadata: Metadata = { title: 'Patients' };
 const COLS = 'grid-cols-[minmax(180px,1.3fr)_minmax(170px,1.2fr)_120px_150px_120px]';
 
 export default async function PatientsPage({ searchParams }: PageProps) {
-  await requireUser();
+  const { practiceId } = await requireSession();
   const q = (one((await searchParams).q) ?? '').trim();
-  const rows = db.patients.filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase()));
+  const [rows, appointments, recallQueue] = await Promise.all([listPatients(practiceId, q), listAppointments(practiceId), listRecallQueue(practiceId)]);
 
   return (
     <>
@@ -36,8 +36,8 @@ export default async function PatientsPage({ searchParams }: PageProps) {
           <div className="min-w-[860px] xl:min-w-0">
             <div role="row" className={clsx('cf-th static xl:sticky', COLS)}><span>Patient</span><span>Next appointment</span><span>Last visit</span><span>Consent</span><span>Recall</span></div>
             {rows.map((p) => {
-              const next = db.appointments.find((a) => a.patientId === p.id && a.day >= TODAY_INDEX);
-              const recall = db.recallQueue.find((r) => r.patientId === p.id);
+              const next = appointments.find((a) => a.patientId === p.id && a.day >= TODAY_INDEX);
+              const recall = recallQueue.find((r) => r.patientId === p.id);
               return (
                 <div role="row" key={p.id} className={clsx('cf-row relative hover:bg-surface2', COLS)}>
                   <span className="flex min-w-0 flex-col">

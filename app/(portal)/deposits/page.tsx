@@ -6,10 +6,10 @@ import { Pill } from '@/components/ui/Pill';
 import { StatTile, Empty } from '@/components/ui/Card';
 import { MaskedPhone } from '@/components/ui/MaskedPhone';
 import { ActionButton } from '@/components/ui/ActionButton';
-import { requireUser } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { can } from '@/lib/permissions';
-import { db, findPatient } from '@/lib/db';
-import { DEPOSIT_CANDIDATES, DEPOSIT_TOTALS_7D } from '@/lib/mock/deposits';
+import { depositCandidates, listDeposits, patientMap } from '@/lib/db';
+import { DEPOSIT_TOTALS_7D } from '@/lib/mock/deposits';
 import { statusTone } from '@/lib/tones';
 import { fmtNumber, money, one, withParams } from '@/lib/format';
 import type { DepositStatus, PageProps } from '@/lib/types';
@@ -21,20 +21,20 @@ const COLS = 'grid-cols-[118px_minmax(150px,1.1fr)_minmax(170px,1.4fr)_70px_84px
 const STATUSES: DepositStatus[] = ['Paid', 'Pending', 'Failed', 'Refunded'];
 
 export default async function DepositsPage({ searchParams }: PageProps) {
-  const user = await requireUser();
+  const { user, practiceId } = await requireSession();
+  const [all, patients, pending] = await Promise.all([listDeposits(practiceId), patientMap(practiceId), depositCandidates(practiceId)]);
   const sp = await searchParams;
   const status = STATUSES.find((s) => s === one(sp.status));
   const showMoney = can(user.role, 'seeDepositTotals');
   const canRefund = can(user.role, 'refundDeposits');
-  const all = db.deposits;
   const count = (s: DepositStatus) => all.filter((d) => d.status === s).length;
   const sum = (s: DepositStatus) => all.filter((d) => d.status === s).reduce((a, d) => a + d.amount, 0);
   const rows = all.filter((d) => !status || d.status === status);
   const failed = count('Failed');
 
-  const candidates = DEPOSIT_CANDIDATES.map((c) => {
-    const p = findPatient(c.patientId)!;
-    return { patientId: p.id, label: `${p.name} — ${c.label}`, last4: p.last4 };
+  const candidates = pending.flatMap((c) => {
+    const p = patients.get(c.patientId);
+    return p ? [{ patientId: p.id, label: `${p.name} — ${c.label}`, last4: p.last4 }] : [];
   });
 
   return (
@@ -68,7 +68,7 @@ export default async function DepositsPage({ searchParams }: PageProps) {
           <div className="min-w-[980px] 2xl:min-w-0">
             <div role="row" className={clsx('cf-th static 2xl:sticky', COLS)}><span>Sent</span><span>Patient</span><span>For appointment</span><span className="text-right">Amount</span><span>Link</span><span>Status</span><span /></div>
             {rows.map((d) => {
-              const p = findPatient(d.patientId)!;
+              const p = patients.get(d.patientId)!;
               const resend = d.status === 'Pending' || d.status === 'Failed';
               return (
                 <div role="row" key={d.id} className={clsx('cf-row', COLS)}>

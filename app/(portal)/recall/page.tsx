@@ -8,10 +8,9 @@ import { Icon } from '@/components/ui/Icon';
 import { MaskedPhone } from '@/components/ui/MaskedPhone';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { ConsentChips } from '@/components/ui/ConsentChips';
-import { requireUser } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { can } from '@/lib/permissions';
-import { db, findPatient } from '@/lib/db';
-import { RECALL_TOTAL_IN_QUEUE } from '@/lib/mock/recall';
+import { listRecallQueue, listRecallRules, patientMap } from '@/lib/db';
 import { CHANNEL_LABEL, statusTone } from '@/lib/tones';
 import { one, withParams } from '@/lib/format';
 import type { PageProps, RecallStatus } from '@/lib/types';
@@ -23,11 +22,11 @@ const COLS = 'grid-cols-[minmax(150px,1.2fr)_minmax(150px,1.3fr)_64px_108px_minm
 const STATUSES: RecallStatus[] = ['Due', 'Contacted', 'Rebooked', 'No response', 'Opted out'];
 
 export default async function RecallPage({ searchParams }: PageProps) {
-  const user = await requireUser();
+  const { user, practiceId } = await requireSession();
   const sp = await searchParams;
   const tab = one(sp.tab) === 'rules' ? 'rules' : 'queue';
   const status = STATUSES.find((s) => s === one(sp.status));
-  const queue = db.recallQueue;
+  const [queue, rules, patients] = await Promise.all([listRecallQueue(practiceId), listRecallRules(practiceId), patientMap(practiceId)]);
   const rows = queue.filter((r) => !status || r.status === status);
   const due = queue.filter((r) => r.status === 'Due').length;
   const canEditRules = can(user.role, 'editReceptionist');
@@ -57,8 +56,8 @@ export default async function RecallPage({ searchParams }: PageProps) {
               <div className="min-w-[980px] 2xl:min-w-0">
                 <div role="row" className={clsx('cf-th static 2xl:sticky', COLS)}><span>Patient</span><span>Reason</span><span>Due</span><span>Status</span><span>Last contact</span><span>Consent</span><span>Next step</span></div>
                 {rows.map((r) => {
-                  const p = findPatient(r.patientId)!;
-                  const rule = db.recallRules.find((x) => x.id === r.ruleId);
+                  const p = patients.get(r.patientId)!;
+                  const rule = rules.find((x) => x.id === r.ruleId);
                   return (
                     <div role="row" key={r.patientId} className={clsx('cf-row relative hover:bg-surface2', COLS)}>
                       <span className="flex min-w-0 flex-col">
@@ -78,7 +77,7 @@ export default async function RecallPage({ searchParams }: PageProps) {
                   );
                 })}
                 <div className="flex flex-wrap gap-x-5 gap-y-2 px-5 py-3 text-xs text-muted">
-                  <span className="font-mono text-[11px]">SHOWING {rows.length} OF {RECALL_TOTAL_IN_QUEUE} IN QUEUE</span>
+                  <span className="font-mono text-[11px]">SHOWING {rows.length} OF {queue.length} IN QUEUE</span>
                   <span>OmniDesk contacts patients 9 AM–7 PM their time, only on channels they&apos;ve consented to. A STOP reply opts them out right away.</span>
                 </div>
               </div>
@@ -86,7 +85,7 @@ export default async function RecallPage({ searchParams }: PageProps) {
           </>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,380px),1fr))] items-start gap-4">
-            {db.recallRules.map((r) => <RuleCard key={r.id} rule={r} editable={canEditRules} />)}
+            {rules.map((r) => <RuleCard key={r.id} rule={r} editable={canEditRules} />)}
           </div>
         )}
       </PageBody>

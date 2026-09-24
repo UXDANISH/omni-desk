@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Optional: build into another folder (e.g. to build while `next dev` is running).
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {

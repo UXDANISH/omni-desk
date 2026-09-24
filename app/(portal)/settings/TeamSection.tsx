@@ -111,9 +111,11 @@ export function InviteButton({ canInviteManagers }: { canInviteManagers: boolean
   const valid = /.+@.+\..+/.test(email);
 
   async function send() {
-    const r = await api<{ message: string }>('/api/team', 'POST', { email, role });
+    const r = await api<{ message: string; inviteUrl?: string }>('/api/team', 'POST', { email, role });
     if (!r.ok) return toast(r.error);
-    toast(r.data.message);
+    // Development only, until email is connected: hand over the link directly.
+    const copied = r.data.inviteUrl && (await navigator.clipboard?.writeText(r.data.inviteUrl).then(() => true, () => false));
+    toast(r.data.inviteUrl ? `Invite created. Email isn't connected yet — ${copied ? 'the link was copied to your clipboard' : 'the link is in the server log'}.` : r.data.message);
     setOpen(false);
     setEmail('');
     router.refresh();

@@ -1,10 +1,8 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { cookies } from 'next/headers';
-import { requireUser, publicUser, PRACTICE_COOKIE } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { requireSession, publicUser } from '@/lib/auth';
+import { listCalls, listTeam } from '@/lib/db';
 import { isNeedsHuman } from '@/lib/tones';
-import { PRACTICES } from '@/lib/mock/team';
 import { SessionProvider } from '@/components/shell/SessionProvider';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { MobileTabBar } from '@/components/shell/MobileTabBar';
@@ -19,11 +17,10 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
-  const practiceId = (await cookies()).get(PRACTICE_COOKIE)?.value;
-  const practice = PRACTICES.find((p) => p.id === practiceId) ?? PRACTICES[0];
-  const needs = db.calls.filter(isNeedsHuman).length;
-  const team = db.team
+  const { user, practice, practiceId } = await requireSession();
+  const [calls, members] = await Promise.all([listCalls(practiceId), listTeam(practiceId)]);
+  const needs = calls.filter(isNeedsHuman).length;
+  const team = members
     .filter((t) => t.status === 'Active')
     .map(({ id, name, initials, role, lastActive }) => ({ id, name, initials, role, lastActive }));
 

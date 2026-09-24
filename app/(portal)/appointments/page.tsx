@@ -5,8 +5,8 @@ import { TopBar, PageBody } from '@/components/shell/TopBar';
 import { SegmentedLinks, FilterChips } from '@/components/ui/Nav';
 import { Pill, Tag } from '@/components/ui/Pill';
 import { Icon } from '@/components/ui/Icon';
-import { requireUser } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { requireSession } from '@/lib/auth';
+import { listAppointments } from '@/lib/db';
 import { PROVIDERS, WEEK, TODAY_INDEX, NOW_MINUTES } from '@/lib/mock/appointments';
 import { statusTone } from '@/lib/tones';
 import { dayLabel, fmtTime, one, withParams } from '@/lib/format';
@@ -30,7 +30,8 @@ function blockClass(a: Appointment) {
 }
 
 export default async function AppointmentsPage({ searchParams }: PageProps) {
-  await requireUser();
+  const { practiceId } = await requireSession();
+  const appointments = await listAppointments(practiceId);
   const sp = await searchParams;
   const view = (['day', 'week', 'list'] as const).find((v) => v === one(sp.view)) ?? 'day';
   const day = Math.min(5, Math.max(0, Number(one(sp.day) ?? TODAY_INDEX) || 0));
@@ -38,11 +39,11 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
   const apptId = one(sp.appt);
   const current = { view: view === 'day' ? undefined : view, day: view === 'day' && day !== TODAY_INDEX ? String(day) : undefined, by };
 
-  const scope = view === 'day' ? db.appointments.filter((a) => a.day === day) : view === 'week' ? db.appointments.filter((a) => a.day < 6) : db.appointments.filter((a) => a.day >= TODAY_INDEX);
+  const scope = view === 'day' ? appointments.filter((a) => a.day === day) : view === 'week' ? appointments.filter((a) => a.day < 6) : appointments.filter((a) => a.day >= TODAY_INDEX);
   const shown = scope.filter((a) => !by || a.bookedBy === by);
   const aiN = scope.filter((a) => a.bookedBy === 'ai').length;
   const unconfirmed = scope.filter((a) => a.status === 'Unconfirmed').length;
-  const selected = db.appointments.find((a) => a.id === apptId);
+  const selected = appointments.find((a) => a.id === apptId);
   const href = (a: Appointment) => withParams('/appointments', current, { appt: a.id });
   const title = (a: Appointment) => `${fmtTime(a.start)} · ${a.patient} · ${a.service} · ${a.status}`;
 
@@ -123,7 +124,7 @@ export default async function AppointmentsPage({ searchParams }: PageProps) {
           <div className="cf-card overflow-x-auto">
             <div className="grid min-w-[900px] grid-cols-[repeat(6,minmax(150px,1fr))]">
               {[0, 1, 2, 3, 4, 5].map((d) => {
-                const all = db.appointments.filter((a) => a.day === d);
+                const all = appointments.filter((a) => a.day === d);
                 return (
                   <div key={d} className="flex flex-col border-l first:border-l-0">
                     <Link href={withParams('/appointments', { by }, { day: d === TODAY_INDEX ? undefined : String(d) })} className={clsx('flex items-baseline gap-2 border-b px-3 py-2.5 no-underline', d === TODAY_INDEX ? 'bg-accent-bg text-accent-tx' : 'bg-surface2 text-ink')}>

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { guard, bad, readJson } from '@/lib/api';
-import { db, audit } from '@/lib/db';
+import { audit, getReceptionist, setReceptionist } from '@/lib/db';
 
 export async function GET() {
   const g = await guard();
   if (g.error) return g.error;
-  return NextResponse.json({ settings: db.receptionist });
+  return NextResponse.json({ settings: await getReceptionist(g.practiceId) });
 }
 
 const Settings = z.object({
@@ -29,11 +29,11 @@ export async function PUT(req: Request) {
   const parsed = Settings.safeParse(await readJson(req));
   if (!parsed.success) return bad(parsed.error.issues[0]?.message ?? 'Invalid settings');
   // Locked guardrails can't be switched off.
-  const locked = db.receptionist.guardrails.filter((x) => x.locked).map((x) => x.text);
+  const locked = (await getReceptionist(g.practiceId)).guardrails.filter((x) => x.locked).map((x) => x.text);
   parsed.data.guardrails.forEach((x) => {
     if (locked.includes(x.text)) { x.locked = true; x.on = true; }
   });
-  db.receptionist = parsed.data;
-  audit(g.user.id, 'update-receptionist', 'settings');
-  return NextResponse.json({ settings: db.receptionist, message: 'Saved. OmniDesk uses these settings from the next call.' });
+  await setReceptionist(g.practiceId, parsed.data);
+  await audit(g.practiceId, g.user.id, 'update-receptionist', 'settings');
+  return NextResponse.json({ settings: parsed.data, message: 'Saved. OmniDesk uses these settings from the next call.' });
 }

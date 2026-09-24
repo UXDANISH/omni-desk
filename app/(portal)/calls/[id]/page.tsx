@@ -5,7 +5,7 @@ import { TopBar, PageBody } from '@/components/shell/TopBar';
 import { Pill } from '@/components/ui/Pill';
 import { Fact } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { requireUser } from '@/lib/auth';
+import { requireSession } from '@/lib/auth';
 import { findCall } from '@/lib/db';
 import { OUTCOME } from '@/lib/tones';
 import { durSeconds } from '@/lib/format';
@@ -20,8 +20,8 @@ export async function generateMetadata({ params }: IdPageProps): Promise<Metadat
 }
 
 export default async function CallDetailPage({ params }: IdPageProps) {
-  await requireUser();
-  const call = findCall((await params).id);
+  const { practiceId } = await requireSession();
+  const call = await findCall(practiceId, (await params).id);
   if (!call) notFound();
   const o = OUTCOME[call.outcome];
 

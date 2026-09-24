@@ -5,10 +5,9 @@ import { TopBar, PageBody } from '@/components/shell/TopBar';
 import { Pill, Tag } from '@/components/ui/Pill';
 import { Card, CardHeader, Empty } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { requireUser } from '@/lib/auth';
-import { db, findPatient } from '@/lib/db';
+import { requireSession } from '@/lib/auth';
+import { callsForPatient, findPatient, listAppointments, listRecallQueue, recallHistory } from '@/lib/db';
 import { PROVIDERS, TODAY_INDEX } from '@/lib/mock/appointments';
-import { RECALL_HISTORY } from '@/lib/mock/recall';
 import { OUTCOME, statusTone } from '@/lib/tones';
 import { dayLabel, fmtTime, maskEmail } from '@/lib/format';
 import type { IdPageProps } from '@/lib/types';
@@ -20,13 +19,17 @@ import { AddPatientButton } from '../AddPatientButton';
 export const metadata: Metadata = { title: 'Patient' };
 
 export default async function PatientPage({ params }: IdPageProps) {
-  await requireUser();
-  const p = findPatient((await params).id);
+  const { practiceId } = await requireSession();
+  const p = await findPatient(practiceId, (await params).id);
   if (!p) notFound();
-  const recall = db.recallQueue.find((r) => r.patientId === p.id);
-  const upcoming = db.appointments.filter((a) => a.patientId === p.id && a.day >= TODAY_INDEX);
-  const calls = db.calls.filter((c) => c.patientId === p.id);
-  const history = RECALL_HISTORY[p.id] ?? [];
+  const [queue, appts, calls, history] = await Promise.all([
+    listRecallQueue(practiceId, p.id),
+    listAppointments(practiceId, p.id),
+    callsForPatient(practiceId, p.id),
+    recallHistory(practiceId, p.id),
+  ]);
+  const recall = queue[0];
+  const upcoming = appts.filter((a) => a.day >= TODAY_INDEX);
   const since = p.since === '2026' ? 'Sep 2026' : `Jan ${p.since}`;
 
   return (

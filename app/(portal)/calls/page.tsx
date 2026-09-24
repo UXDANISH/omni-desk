@@ -7,8 +7,8 @@ import { Pill, Tag } from '@/components/ui/Pill';
 import { Empty } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { MaskedPhone } from '@/components/ui/MaskedPhone';
-import { requireUser } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { requireSession } from '@/lib/auth';
+import { listCalls } from '@/lib/db';
 import { CALL_FILTERS, callCounts, queryCalls, type CallFilter } from '@/lib/queries';
 import { OUTCOME } from '@/lib/tones';
 import { one, withParams } from '@/lib/format';
@@ -19,15 +19,16 @@ export const metadata: Metadata = { title: 'Calls' };
 const COLS = 'grid-cols-[128px_minmax(180px,1.1fr)_minmax(200px,1.4fr)_150px_80px_24px]';
 
 export default async function CallsPage({ searchParams }: PageProps) {
-  await requireUser();
+  const { practiceId } = await requireSession();
+  const calls = await listCalls(practiceId);
   const sp = await searchParams;
   const f = one(sp.outcome) as CallFilter | undefined;
   const filter: CallFilter = CALL_FILTERS.some((x) => x.key === f) ? (f as CallFilter) : 'all';
   const q = one(sp.q) ?? '';
   const after = one(sp.after) === '1';
   const current = { outcome: filter === 'all' ? undefined : filter, q: q || undefined, after: after ? '1' : undefined };
-  const rows = queryCalls({ filter, q, afterHours: after });
-  const counts = callCounts();
+  const rows = queryCalls(calls, { filter, q, afterHours: after });
+  const counts = callCounts(calls);
 
   return (
     <>
@@ -78,7 +79,7 @@ export default async function CallsPage({ searchParams }: PageProps) {
             </div>
           ))}
           {!rows.length && <Empty>No calls match these filters.</Empty>}
-          <div className="px-5 py-3 font-mono text-[11px] text-muted">SHOWING {rows.length} OF {db.calls.length} CALLS · LAST 7 DAYS</div>
+          <div className="px-5 py-3 font-mono text-[11px] text-muted">SHOWING {rows.length} OF {calls.length} CALLS · LAST 7 DAYS</div>
         </div>
 
         {/* Phone cards */}
