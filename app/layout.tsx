@@ -42,7 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Theme lives in a cookie so the server renders the right theme with no flash. Light by default.
   const theme = (await cookies()).get('cf_theme')?.value === 'dark' ? 'dark' : 'light';
   return (
-    <html lang="en" data-theme={theme} className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en" data-theme={theme} className={`${display.variable} ${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body>
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:shadow-pop">
           Skip to content
